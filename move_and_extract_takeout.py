@@ -5,14 +5,20 @@ import shutil
 import zipfile
 import json
 import subprocess
+import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
+def isTruthy(resp) -> bool:
+    return str(resp).lower().strip() in ["t", "true", "yes", "y", "1"]
+
 # Source and destination directories
 DOWNLOADS_DIR = os.getenv("DOWNLOADS_DIR", os.path.expanduser("~/Downloads"))
 DESTINATION_DIR = os.getenv("DESTINATION_DIR")
+DELETE_AS_YOU_GO:bool = isTruthy(os.getenv("DELETE_AS_YOU_GO", False))
 EXTRACTION_DIR = os.path.join(DESTINATION_DIR, "contents")
 
 # Ensure destination and extraction directories exist
@@ -29,16 +35,20 @@ def get_takeout_files(directory, subset_size=None):
     return takeout_files
 
 # Function to extract files
-def extract_takeout_files(takeout_files, extraction_dir):
+def extract_takeout_files(takeout_files, extraction_dir, delete_as_you_go:bool= False):
     for file_path in takeout_files:
+        _path = Path(file_path)
         try:
             # Extract the contents to the extraction folder
-            file_name = os.path.basename(file_path)
+            file_name = _path.name
             print(f"Extracting {file_name} to {extraction_dir}...")
             with zipfile.ZipFile(file_path, 'r') as zip_ref:
                 zip_ref.extractall(extraction_dir)
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
+        else:
+            if delete_as_you_go:
+                _path.unlink()
 
 # Function to convert JSON metadata to EXIF data
 def convert_metadata_to_exif(extraction_dir):
@@ -107,12 +117,12 @@ def main():
     print(f"Found {len(takeout_files)} Takeout files.")
 
     # Get user input for stages to run
-    run_extraction = os.getenv("RUN_EXTRACTION", "yes").strip().lower() == "yes"
-    run_metadata_conversion = os.getenv("RUN_METADATA_CONVERSION", "yes").strip().lower() == "yes"
-    run_organization = os.getenv("RUN_ORGANIZATION", "yes").strip().lower() == "yes"
+    run_extraction = isTruthy(os.getenv("RUN_EXTRACTION", "yes"))
+    run_metadata_conversion = isTruthy(os.getenv("RUN_METADATA_CONVERSION", "yes"))
+    run_organization = isTruthy(os.getenv("RUN_ORGANIZATION", "yes"))
 
     if run_extraction:
-        extract_takeout_files(takeout_files, EXTRACTION_DIR)
+        extract_takeout_files(takeout_files, EXTRACTION_DIR, DELETE_AS_YOU_GO)
     if run_metadata_conversion:
         convert_metadata_to_exif(EXTRACTION_DIR)
     if run_organization:
