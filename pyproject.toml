@@ -1,6 +1,11 @@
 [project]
 name = "google-takeout-automation"
 version = "1.1.0"
+authors = [
+    { name = "Karthick Ramakrishnan" },
+    { name = "Philip Kahn", email = "tigerhawkvok@gmail.com" }
+]
+license = { file = "LICENSE" }
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"

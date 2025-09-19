@@ -42,7 +42,7 @@ def extract_takeout_files(takeout_files, extraction_dir, delete_as_you_go:bool= 
             # Extract the contents to the extraction folder
             file_name = _path.name
             print(f"Extracting {file_name} to {extraction_dir}...")
-            with zipfile.ZipFile(file_path, 'r') as zip_ref:
+            with zipfile.ZipFile(file_path, "r") as zip_ref:
                 zip_ref.extractall(extraction_dir)
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
@@ -59,20 +59,20 @@ def convert_metadata_to_exif(extraction_dir):
                 image_path = os.path.join(root, file_name.replace(".json", ""))
                 if os.path.exists(image_path):
                     try:
-                        with open(json_path, 'r', errors='ignore') as json_file:
+                        with open(json_path, "r", errors="ignore") as json_file:
                             metadata = json.load(json_file)
-                            if 'photoTakenTime' in metadata:
-                                date_time = metadata['photoTakenTime']['formatted']
+                            if "photoTakenTime" in metadata:
+                                date_time = metadata["photoTakenTime"]["formatted"]
                                 try:
-                                    exif_date_time = date_time.replace('-', ':').replace('T', ' ')
+                                    exif_date_time = date_time.replace("-", ":").replace("T", " ")
                                     subprocess.run(["exiftool", f"-DateTimeOriginal={exif_date_time}", image_path])
                                 except ValueError:
                                     print(f"Invalid date format in {json_path}: {date_time}")
-                            if 'title' in metadata:
-                                title = metadata['title']
+                            if "title" in metadata:
+                                title = metadata["title"]
                                 subprocess.run(["exiftool", f"-XPTitle={title}", image_path])
-                            if 'album' in metadata:
-                                album = metadata['album']
+                            if "album" in metadata:
+                                album = metadata["album"]
                                 subprocess.run(["exiftool", f"-XPComment={album}", image_path])
                     except json.JSONDecodeError as e:
                         print(f"Error decoding JSON in {json_path}: {e}")
