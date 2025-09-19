@@ -1,16 +1,20 @@
 # Copyright (c) 2025 Karthick Ramakrishnan
 # This file is part of Google Takeout Automation and is licensed under the MIT License.
 # See the LICENSE file in the project root for more information.
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.edge.service import Service as EdgeService
-from selenium.webdriver.chrome.service import Service as ChromeService
-import time
 import os
 import re
+import time
+from collections.abc import Collection
 from pathlib import Path
+from typing import Final
+
+import pyjson5
 import selenium
 from dotenv import load_dotenv
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.common.by import By
+from selenium.webdriver.edge.service import Service as EdgeService
 
 # Load environment variables from .env file
 load_dotenv()
@@ -22,41 +26,48 @@ WEBDRIVER_PATH = os.getenv("WEBDRIVER_PATH")
 DOWNLOAD_FOLDER = os.getenv("DOWNLOAD_FOLDER")
 
 # Browser type
-BROWSER_TYPE = os.getenv("BROWSER_TYPE", "edge").lower()
+BROWSER_TYPE = os.getenv("BROWSER_TYPE", "edge").lower().strip()
 
 REAUTH_PASSWORD = os.getenv("REAUTH_PW_INSECURE", "")
+if REAUTH_PASSWORD.lower().strip() in ["none", "null"]:
+    REAUTH_PASSWORD = "" # pyright: ignore[reportConstantRedefinition]
 
-# Configure browser options
-if BROWSER_TYPE == "edge":
-    options = webdriver.EdgeOptions()
-    service = EdgeService(WEBDRIVER_PATH)
-elif BROWSER_TYPE == "chrome":
-    options = webdriver.ChromeOptions()
-    service = ChromeService(WEBDRIVER_PATH)
-else:
-    raise ValueError("Unsupported browser type. Please use 'edge' or 'chrome'.")
-
+standardOptionsArgs = [
+    "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36", # cSpell: disable-line
+    "--disable-blink-features=AutomationControlled"
+]
 prefs = {"download.default_directory": DOWNLOAD_FOLDER}
-options.add_experimental_option("prefs", prefs)
-options.add_argument(
-    "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
-)
-options.add_argument("--disable-blink-features=AutomationControlled")
 
-# Set up the Selenium WebDriver
-if BROWSER_TYPE == "edge":
-    driver = webdriver.Edge(service=service, options=options)
-elif BROWSER_TYPE == "chrome":
-    driver = webdriver.Chrome(service=service, options=options)
+runtimeConfigPath = Path("config.json5")
+if not runtimeConfigPath.is_file():
+    raise FileNotFoundError("config.json5 file not found. Please create one -- see the repository for examples.")
+runtimeConfig = pyjson5.loads(runtimeConfigPath.read_text("utf-8"))
+VALID_TAKEOUT_DL_URLS:Final[Collection[str]] = runtimeConfig["takeoutDownloadPageURLFragments"]
 
-RETRIES = 24 * 60
+# Configure browser options and
+# initialize the WebDriver based on the selected browser type
+match BROWSER_TYPE:
+    case "edge":
+        options = webdriver.EdgeOptions()
+        service = EdgeService(WEBDRIVER_PATH)
+        options.add_experimental_option("prefs", prefs)
+        for _arg in standardOptionsArgs:
+            options.add_argument(_arg)
+        driver = webdriver.Edge(service= service, options= options)
+    case "chrome":
+        options = webdriver.ChromeOptions()
+        service = ChromeService(WEBDRIVER_PATH)
+        options.add_experimental_option("prefs", prefs)
+        for _arg in standardOptionsArgs:
+            options.add_argument(_arg)
+        driver = webdriver.Chrome(service= service, options= options)
+    case _:
+        raise ValueError(f"Unsupported browser type `{BROWSER_TYPE}`. Please use 'edge' or 'chrome'.")
 
-def onTakeoutPage() -> bool:
-    validURLs = [
-        "takeout.google.com/settings/takeout/downloads",
-        "takeout.google.com/manage/archive",
-    ]
-    for url in validURLs:
+RETRIES:Final[int] = int(runtimeConfig["waitForUserInputHours"]) * 60
+
+def isOnTakeoutPage() -> bool:
+    for url in VALID_TAKEOUT_DL_URLS:
         if url in driver.current_url:
             return True
     return False
@@ -74,8 +85,10 @@ def get_downloaded_serials(download_folder):
     return serials
 
 def wait_for_reauthentication():
-    # 11 hours for a workday
-    for attempt in range(RETRIES):
+    sleepDuration = 60 # seconds
+    minuteMultiplier = 60 / sleepDuration
+    _retries = int(RETRIES * 60 * minuteMultiplier)
+    for attempt in range(_retries):
         if len(REAUTH_PASSWORD) > 0:
             print("Trying automatic login")
             try:
@@ -86,15 +99,15 @@ def wait_for_reauthentication():
                 time.sleep(1)
                 nextButton = driver.find_element(By.CSS_SELECTOR, "#passwordNext button")
                 nextButton.click()
-                time.sleep(30)
-                if onTakeoutPage():
+                time.sleep(sleepDuration // 3)  # Wait a bit for the page to load
+                if isOnTakeoutPage():
                     print("*" * 20, "\n", "Automatic login success\n", "*" * 20, "\n")
                     return True
             except Exception:
                 pass
         print(f"Reauthentication required. Please log in again. Attempt {attempt + 1} of {RETRIES}.")
         time.sleep(60)  # Wait for 1 minute
-        if onTakeoutPage():
+        if isOnTakeoutPage():
             return True
     return False
 
@@ -102,7 +115,7 @@ def wait_for_stale_element_retry():
     for attempt in range(36):
         print(f"Stale element reference exception caught. Retrying... Attempt {attempt + 1} of 36.")
         time.sleep(5)  # Wait for 1 minute
-        if onTakeoutPage():
+        if isOnTakeoutPage():
             return True
         print("Invalid URL:", driver.current_url)
     return False
@@ -180,7 +193,7 @@ def download_files(_downloaded_serials):
 try:
     # Open the Google Takeout downloads page
     driver.get("https://takeout.google.com/settings/takeout/downloads")
-    input("Log in to your Google account & choose the takeout export to dowload. Then press Enter to continue...")
+    input("Log in to your Google account & choose the takeout export to download. Then press Enter to continue...")
 
     # Get already downloaded serials
     downloaded_serials = get_downloaded_serials(DOWNLOAD_FOLDER)

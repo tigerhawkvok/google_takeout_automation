@@ -1,0 +1,12 @@
+{
+    // URL fragments that are an OK Google Takeout
+    // download page. These may change from takeout
+    // mechanism / Google updates, so if your page
+    // isn't working, check if your takeout page is
+    // represented here.
+    takeoutDownloadPageURLFragments: [
+        "takeout.google.com/settings/takeout/downloads",
+        "takeout.google.com/manage/archive",
+    ],
+    waitForUserInputHours: 24, // How many hours to wait for user input before quitting
+}

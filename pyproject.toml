@@ -3,9 +3,81 @@ name = "google-takeout-automation"
 version = "1.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 dependencies = [
     "chromedriver-autoinstaller>=0.6.4",
+    "pyjson5>=1.6.9,<2.0.0",
     "python-dotenv>=1.1.1",
     "selenium>=4.35.0",
 ]
+
+[tool.uv]
+add-bounds = "major"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.13.1",
+]
+
+[tool.pyright]
+# https://github.com/microsoft/pyright/blob/main/docs/configuration.md
+typeCheckingMode = "basic"
+reportUnnecessaryTypeIgnoreComment = "information"
+reportImplicitOverride = "error"
+reportShadowedImports = "error"
+reportDuplicateImport = "warning"
+reportMatchNotExhaustive  = "warning"
+reportImplicitStringConcatenation = "error"
+reportUnnecessaryContains = "information"
+reportUnnecessaryComparison = "information"
+reportCallInDefaultInitializer  = "information"
+reportPrivateUsage = false
+reportConstantRedefinition = "warning"
+reportPossiblyUnboundVariable = "error"
+# reportUnusedCallResult = "information"
+reportUnusedFunction = "information"
+reportUnusedClass = "information"
+reportUnnecessaryCast = "information"
+# reportUnknownLambdaType = "information"
+# reportUnknownArgumentType = "information" # *args and **kwargs explode this
+# reportUnknownParameterType = "information" # *args and **kwargs explode this
+reportUninitializedInstanceVariable = "warning"
+reportDeprecated = "warning"
+reportUntypedBaseClass = "information"
+reportUntypedClassDecorator = "information"
+# reportUntypedFunctionDecorator = "information"
+# reportImportCycles = "information"
+settingsNotOverridable = "off"
+exclude = [".venv/*"]
+
+#################################
+########## Ruff ###############
+#################################
+# https://docs.astral.sh/ruff/rules/
+
+
+[tool.ruff]
+line-length = 320
+indent-width = 4
+extend-exclude = ["**/*DEBUGGER.ipynb"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "RUF", "FIX", "PTH", "PD", "NPY", "TRY", "PT", "B", "PLC0415", "NPY201", "PLR1711", "PLR2004", "Q000", "Q001", "Q003", "S102", "FLY", "I"] # , "PLC1901", "PLR6301",
+ignore = ["E501", "PD002", "TRY003", "B028", "E402", "B019", "B034", "TRY300", "TRY301", "RUF018", "PD009", "RUF100"]
+exclude = [
+    ".venv/*",
+]
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = ["E712"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+line-ending = "lf"
+docstring-code-format = false

@@ -1,0 +1,24 @@
+{
+    "version": "0.2",
+    "language": "en",
+    "ignorePaths": [
+        "cSpell.json",
+        "pyproject.toml",
+        "requirements.txt",
+        "settings.json",
+        "pylock.toml",
+        "config.json5",
+        "*.lock",
+        ".env",
+        ".gitignore"
+    ],
+    "words": [
+        "crdownload",
+        "dotenv",
+        "Karthick",
+        "prefs",
+        "pyjson",
+        "Ramakrishnan",
+        "reauthentication"
+    ]
+}
