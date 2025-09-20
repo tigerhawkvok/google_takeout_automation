@@ -10,4 +10,5 @@
     ],
     waitForUserInputHours: 24, // How many hours to wait for user input before quitting
     downloadButtonCSSSelector: "i.material-icons-extended + span + a", // CSS selector for the download button
+    retryDownloadTimeoutMinutes: 15, // How many minutes to wait before aborting and retrying a download
 }

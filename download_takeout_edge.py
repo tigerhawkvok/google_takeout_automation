@@ -90,6 +90,7 @@ match BROWSER_TYPE:
         raise ValueError(f"Unsupported browser type `{BROWSER_TYPE}`. Please use 'edge' or 'chrome'.")
 
 RETRY_HOURS:Final[int] = int(runtimeConfig["waitForUserInputHours"]) * 60
+RETRY_DOWNLOAD_MINUTES:Final[float] = float(runtimeConfig.get("retryDownloadTimeoutMinutes", 30))
 TAKEOUT_SELECTOR:Final[str] = runtimeConfig.get("downloadButtonCSSSelector", "i.material-icons-extended + span + a")
 INCOMPLETE_DOWNLOAD_SUFFIX:Final[str] = ".crdownload"
 
@@ -106,8 +107,13 @@ def hasIncompleteDownloads(download_folder:PathLike) -> bool:
     return any(filename.name.endswith(INCOMPLETE_DOWNLOAD_SUFFIX) for filename in _downloads.iterdir())
 
 def wait_for_downloads(download_folder:PathLike):
+    elapsed = 0
+    _retrySeconds = RETRY_DOWNLOAD_MINUTES * 60
     while hasIncompleteDownloads(download_folder):
         time.sleep(1)
+        elapsed += 1
+        if elapsed >= _retrySeconds:
+            raise TimeoutError(f"Download did not complete within {RETRY_DOWNLOAD_MINUTES} minutes.")
 
 def get_downloaded_serials(download_folder:PathLike) -> Set[str]:
     serials:Set[str] = set()
@@ -168,8 +174,10 @@ def download_files(_downloaded_serials) -> None:
     if not download_elements:
         return
 
+    SKIP_FILE = Path(__file__).parent / "SKIPPED_DOWNLOADS.txt"
     _ok = True
     for i, element in enumerate(download_elements):
+        _retryCount = 0
         while True:
             if not _ok:
                 # use alternate re-crawl method
@@ -204,8 +212,28 @@ def download_files(_downloaded_serials) -> None:
                     if not wait_for_reauthentication():
                         print("Failed to reauthenticate. Exiting...")
                         return
-
-                wait_for_downloads(DOWNLOAD_FOLDER)
+                try:
+                    wait_for_downloads(DOWNLOAD_FOLDER)
+                except TimeoutError as e:
+                    print(e)
+                    # Remove the incomplete download file if it exists
+                    for _incomplete in DOWNLOAD_FOLDER.glob(f"*{INCOMPLETE_DOWNLOAD_SUFFIX}"):
+                        print(f"\tRemoving incomplete download: {_incomplete.name}")
+                        _incomplete.unlink()
+                    time.sleep(2)  # Wait a bit before retrying
+                    _ok = False
+                    _retryCount += 1
+                    if _retryCount >= 5:
+                        print("Maximum retry attempts reached. Skipping this file.")
+                        if serial:
+                            _skipped = []
+                            if SKIP_FILE.is_file():
+                                _skipped = SKIP_FILE.read_text("utf-8").splitlines()
+                            _skipped.append(serial)
+                            SKIP_FILE.write_text("\n".join(_skipped), encoding="utf-8")
+                        break
+                    print("Retrying download...")
+                    continue
 
                 # Update the downloaded serials set
                 if serial:
@@ -251,18 +279,26 @@ if __name__ == "__main__":
         for _incomplete in DOWNLOAD_FOLDER.glob(f"*{INCOMPLETE_DOWNLOAD_SUFFIX}"):
             print(f"\tRemoving incomplete download: {_incomplete.name}")
             _incomplete.unlink()
-    print("Starting browser...")
+    # Get already downloaded serials
+    downloaded_serials = get_downloaded_serials(DOWNLOAD_FOLDER)
+    if downloaded_serials:
+        print("Already got", downloaded_serials)
+    else:
+        print("Fresh download")
+    if isTruthy(input("Assume all intermediate files are downloaded? (y/n): ")):
+        # If we are resuming a download, assume all intermediate files are downloaded
+        # This is not always true, but it's better than re-downloading everything
+        # if the user is sure they have them all
+        max_serial = max(int(s) for s in downloaded_serials if s.isdigit()) if downloaded_serials else 0
+        for s in range(1, max_serial):
+            downloaded_serials.add(str(s).zfill(3))
+        print("Assuming all serials up to", str(max_serial).zfill(3), "are downloaded.")
+    print("Navigating to Google Takeout downloads page...")
     try:
         # Open the Google Takeout downloads page
         driver.get("https://takeout.google.com/settings/takeout/downloads")
         input("\n\nLog in to your Google account & choose the takeout export to download. Then press Enter to continue...\n\n")
 
-        # Get already downloaded serials
-        downloaded_serials = get_downloaded_serials(DOWNLOAD_FOLDER)
-        if downloaded_serials:
-            print("Already got", downloaded_serials)
-        else:
-            print("Fresh download")
 
         # Download files
         download_files(downloaded_serials)
