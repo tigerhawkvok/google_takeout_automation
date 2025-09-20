@@ -52,7 +52,7 @@ if not DOWNLOAD_FOLDER.is_dir():
         DOWNLOAD_FOLDER.mkdir(parents=True)
     except Exception as e:
         raise NotADirectoryError(f"Download folder is not a directory, and couldn't be created: `{DOWNLOAD_FOLDER.resolve()}`") from e
-prefs = {"download.default_directory": DOWNLOAD_FOLDER}
+prefs = {"download.default_directory": str(DOWNLOAD_FOLDER.resolve())}
 
 runtimeConfigPath = Path("config.json5")
 if not runtimeConfigPath.is_file():
