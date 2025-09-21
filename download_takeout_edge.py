@@ -283,16 +283,19 @@ if __name__ == "__main__":
     downloaded_serials = get_downloaded_serials(DOWNLOAD_FOLDER)
     if downloaded_serials:
         print("Already got", downloaded_serials)
+        serialInts = set([int(s) for s in downloaded_serials if s.isdigit()])
+        maxSerial = max(serialInts)
+        if len(missing := serialInts.symmetric_difference(set(range(1, maxSerial)))) != 0:
+            print(f"Warning: There are gaps in the downloaded serials: {missing}. If you don't assume intermediates are skipped, they will be re-downloaded.")
+        if isTruthy(input("Assume all intermediate files are downloaded? (y/n): ")):
+            # If we are resuming a download, assume all intermediate files are downloaded
+            # This is not always true, but it's better than re-downloading everything
+            # if the user is sure they have them all
+            for s in range(1, maxSerial):
+                downloaded_serials.add(str(s).zfill(3))
+            print("Assuming all serials up to", str(maxSerial).zfill(3), "are downloaded.")
     else:
         print("Fresh download")
-    if isTruthy(input("Assume all intermediate files are downloaded? (y/n): ")):
-        # If we are resuming a download, assume all intermediate files are downloaded
-        # This is not always true, but it's better than re-downloading everything
-        # if the user is sure they have them all
-        max_serial = max(int(s) for s in downloaded_serials if s.isdigit()) if downloaded_serials else 0
-        for s in range(1, max_serial):
-            downloaded_serials.add(str(s).zfill(3))
-        print("Assuming all serials up to", str(max_serial).zfill(3), "are downloaded.")
     print("Navigating to Google Takeout downloads page...")
     try:
         # Open the Google Takeout downloads page
